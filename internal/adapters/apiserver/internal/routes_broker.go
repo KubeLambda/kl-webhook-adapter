@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,10 +8,8 @@ import (
 	"serverless-service-webhook-adapter/internal/adapters/broker"
 	"time"
 
-	"go.uber.org/zap"
-
-	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 const AdapterRoutePath = "/api/adapter"
@@ -22,6 +19,7 @@ func SendToBroker() http.HandlerFunc {
 		// Read the request body
 		requestBody, err := io.ReadAll(r.Body)
 		if err != nil {
+			zap.S().Errorf("Failed to read request body: %v", err)
 			http.Error(w, fmt.Sprintf("Failed to read request body: %v", err), http.StatusBadRequest)
 			return
 		}
@@ -29,36 +27,33 @@ func SendToBroker() http.HandlerFunc {
 
 		// Generate a unique correlation ID
 		correlationID := uuid.New().String()
-
-		// correlationID is used to communicate id between producer and consumer
-		msg := &primitive.Message{
-			Topic:         "requestTopic",
-			Body:          requestBody,
-			TransactionId: correlationID,
-		}
+		id := fmt.Sprintf("request.%s", correlationID)
+		zap.S().Debugf("New subject id: %s", id)
 
 		// Create a response channel and store it in the map
-		responseChan := broker.GetResponseChan(correlationID)
+		responseChan := broker.GetResponseChan(id)
 
+		js := *broker.JetStreamCtx
 		// Send the message
-		res, err := broker.QProducer.SendSync(context.Background(), msg)
+		_, err = js.Publish(id, requestBody)
 		if err != nil {
+			zap.S().Errorf("Failed to publish message: %v", err)
 			http.Error(w, fmt.Sprintf("Failed to send message: %v", err), http.StatusInternalServerError)
 			return
 		}
-
-		zap.S().Info("Message sent successfully: result=%s\n", res.String())
 
 		// Wait for the response
 		select {
 		case responseMsg := <-responseChan:
 			// Process and send the response back to the client
 			var responseData map[string]interface{}
-			json.Unmarshal(responseMsg.Body, &responseData)
+			json.Unmarshal(responseMsg.Data, &responseData)
+			responseData["subject"] = "response"
 
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(responseData)
 		case <-time.After(10 * time.Second): // Timeout after 10 seconds
+			zap.S().Errorf("Timeout waiting for response")
 			http.Error(w, "Timeout waiting for response", http.StatusGatewayTimeout)
 		}
 	}

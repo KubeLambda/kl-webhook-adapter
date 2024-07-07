@@ -3,7 +3,7 @@
 # WEBHOOK_ADAPTER_CREDENTIALS_SECRET: -
 # WEBHOOK_ADAPTER_SERVER_ADDR: 0.0.0.0
 # WEBHOOK_ADAPTER_SERVER_PORT: 3001
-# WEBHOOKD_ADAPTER_BROKER_ADDR: namesrv 
+# WEBHOOKD_ADAPTER_BROKER_ADDR: namesrv
 # WEBHOOKD_ADAPTER_BROKER_PORT: 9876
 ---
 name: webhook-adapter
@@ -14,8 +14,6 @@ server:
   addr: 0.0.0.0
   port: 3001
 broker:
-  addr: namesrv
-  port: 9876
-  topics:
-    request: requestTopic
-    response: responseTopic
+  addr: 0.0.0.0
+  port: 4222
+  stream: 'request-response'

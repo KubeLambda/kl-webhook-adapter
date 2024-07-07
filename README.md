@@ -24,7 +24,7 @@ your database URL and credentials). So in this case keep reading README past thi
 To perform an initial launch an application, run this in shell:
 
 ```sh
-./webhook-adapter run --deployment=local
+./bin/webhook-adapter run --deployment=local
 ```
 
 We launch API server by specifying `run` command. `--deployment=local` tells our code to
@@ -35,7 +35,7 @@ your executable file is. You can create a copy of this file and name it,
 for example `prod.yaml` where you can add production-specific settings, then running
 
 ```sh
-./webhook-adapter run --deployment=prod
+./bin/webhook-adapter run --deployment=prod
 ```
 
 will load this production settings for your API server.

@@ -1,109 +1,94 @@
 package broker
 
 import (
-	"context"
 	"fmt"
 	"serverless-service-webhook-adapter/internal/core/app"
 	"sync"
 
-	rocketmq "github.com/apache/rocketmq-client-go/v2"
-	"github.com/apache/rocketmq-client-go/v2/consumer"
-	"github.com/apache/rocketmq-client-go/v2/primitive"
-	"github.com/apache/rocketmq-client-go/v2/producer"
+	"go.uber.org/zap"
+
+	"github.com/nats-io/nats.go"
 )
 
 var (
-	QProducer rocketmq.Producer
-	QConsumer rocketmq.PushConsumer
-
-	responseChans map[string]chan *primitive.MessageExt // Map to store channels for responses
-	mu            sync.Mutex
+	responseChans  map[string]chan *nats.Msg // Map to store channels for responses
+	mu             sync.Mutex
+	NATSConnection *nats.Conn
+	JetStreamCtx   *nats.JetStreamContext
 )
 
-func InitRocketMQ(cfg *app.BrokerConfig) error {
-	var err error
+func JetStreamInit(cfg *app.BrokerConfig) (nats.JetStreamContext, error) {
+	addrURL := fmt.Sprintf("nats://%s:%d", cfg.Addr, cfg.Port)
+	zap.S().Infof("Initialize NATS connection: %s", addrURL)
 
-  if responseChans == nil {
-    responseChans = make(map[string]chan *primitive.MessageExt)
-  }
-
-	listenAddr := fmt.Sprintf("%s:%d", cfg.Addr, cfg.Port)
-
-	// Initialize Producer
-	QProducer, err = rocketmq.NewProducer(
-		producer.WithNsResolver(primitive.NewPassthroughResolver([]string{listenAddr})),
-    producer.WithRetry(2),
-		producer.WithGroupName("webhook-adapter"),
-	)
+	NATSConnection, err := nats.Connect(addrURL)
 	if err != nil {
-		return fmt.Errorf("failed to create producer: %v", err)
+		return nil, err
 	}
+	zap.S().Infof("Connected to '%s'", addrURL)
 
-	if err = QProducer.Start(); err != nil {
-		return fmt.Errorf("failed to start producer: %v", err)
-	}
-
-  // create topics
-  var wg sync.WaitGroup
-  wg.Add(1)
-  err = QProducer.SendAsync(context.Background(),
-    func(ctx context.Context, result *primitive.SendResult, e error) {
-      if e != nil {
-        fmt.Printf("receive message error: %s\n", err)
-      } else {
-        fmt.Printf("send message success: result=%s\n", result.String())
-      }
-      wg.Done()
-    }, primitive.NewMessage(cfg.Topics.Request, []byte("Create topic")))
-
-  if err != nil {
-    fmt.Printf("send message error: %s\n", err)
-  }
-
-	// Initialize Consumer
-	QConsumer, err = rocketmq.NewPushConsumer(
-		consumer.WithNameServer([]string{listenAddr}),
-    consumer.WithRetry(2),
-    consumer.WithAutoCommit(true),
-		consumer.WithGroupName("webhook-adapter"),
-	)
+	jetStreamCtx, err := NATSConnection.JetStream() //nats.PublishAsyncMaxPending(256))
 	if err != nil {
-		return fmt.Errorf("failed to create consumer: %v", err)
+		return nil, err
+	}
+	JetStreamCtx = &jetStreamCtx
+
+	createStream(&jetStreamCtx, cfg.Stream, []string{"request.*", "response.*"})
+
+	if responseChans == nil {
+		responseChans = make(map[string]chan *nats.Msg)
 	}
 
-	if err = QConsumer.Subscribe(cfg.Topics.Response, consumer.MessageSelector{}, handleResponse); err != nil {
-		return fmt.Errorf("failed to subscribe to topic: %v", err)
-	}
+	zap.S().Info("Create consumer for request.*")
+	jetStreamCtx.Subscribe("response.*", handleResponse)
+	return jetStreamCtx, nil
+}
 
-	if err = QConsumer.Start(); err != nil {
-		return fmt.Errorf("failed to start consumer: %v", err)
-	}
+func createStream(js *nats.JetStreamContext, streamName string, subjects []string) error {
+	zap.S().Infof("Get stream '%s'", streamName)
+	jsctx := *js
+	stream, err := jsctx.StreamInfo(streamName)
 
+	if stream == nil {
+		zap.S().Infof("No '%s' stream found, create one", streamName)
+		_, err = jsctx.AddStream(&nats.StreamConfig{
+			Name:     streamName,
+			Subjects: subjects,
+		})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func handleResponse(ctx context.Context, msgs ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
-	for _, msg := range msgs {
-		fmt.Printf("Received message: %s\n", msg.Body)
+func handleResponse(msg *nats.Msg) {
+	zap.S().Debugf("Received message: %s", msg.Data)
 
-		// Get the correlatio ID from the message
-		correlationID := msg.TransactionId
+	// Get the correlation ID from the message
+	correlationID := msg.Subject
 
-		mu.Lock()
-		if ch, exists := responseChans[correlationID]; exists {
-			ch <- msg
-			close(ch)
-			delete(responseChans, correlationID)
+	mu.Lock()
+	if ch, exists := responseChans[correlationID]; exists {
+		err := msg.Ack()
+		if err != nil {
+			zap.S().Error("Unable to Ack %s", msg.Subject)
+			return
 		}
-		mu.Unlock()
+		ch <- msg
+
+		close(ch)
+		delete(responseChans, correlationID)
 	}
-	return consumer.ConsumeSuccess, nil
+	mu.Unlock()
 }
 
-func GetResponseChan(correlationID string) chan *primitive.MessageExt {
+func GetResponseChan(correlationID string) chan *nats.Msg {
+	zap.S().Debugf("Create channel '%s'", correlationID)
+
 	mu.Lock()
 	defer mu.Unlock()
-	ch := make(chan *primitive.MessageExt, 1)
+	ch := make(chan *nats.Msg, 1)
 
 	responseChans[correlationID] = ch
 	return ch

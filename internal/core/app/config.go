@@ -1,11 +1,11 @@
 package app
 
 type Config struct {
-  Name        string
+	Name        string
 	Deployment  string
 	Credentials CredentialsConfig
 	Server      ServerConfig
-  Broker      BrokerConfig
+	Broker      BrokerConfig
 }
 
 type CredentialsConfig struct {
@@ -19,12 +19,7 @@ type ServerConfig struct {
 }
 
 type BrokerConfig struct {
-	Addr string
-	Port int
-  Topics TopicsConfig
-}
-
-type TopicsConfig struct {
-	Request string
-	Response string
+	Addr   string
+	Port   int
+	Stream string
 }

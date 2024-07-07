@@ -14,23 +14,20 @@ import (
 )
 
 func Start(_ context.Context, cfg *app.Config) {
+	_, err := broker.JetStreamInit(&cfg.Broker)
 
-	brokerAddr := fmt.Sprintf("%s:%d", cfg.Broker.Addr, cfg.Broker.Port)
-	zap.S().Infof("Connect to %s", brokerAddr)
-
-	// Initialize RocketMQ
-	if err := broker.InitRocketMQ(&cfg.Broker); err != nil {
+	if err != nil {
 		zap.S().Fatal(err)
-    return
+		return
 	}
-	defer broker.QProducer.Shutdown()
-	defer broker.QConsumer.Shutdown()
+	defer broker.NATSConnection.Close()
 	zap.S().Infof("Successfully connected to the Broker")
 
 	listenAddr := fmt.Sprintf("%s:%d", cfg.Server.Addr, cfg.Server.Port)
 	zap.S().Infof("Starting http server on %s", listenAddr)
 
 	mux := http.NewServeMux()
+
 	apiRoutes(mux)
 
 	c := cors.New(cors.Options{
@@ -45,7 +42,7 @@ func Start(_ context.Context, cfg *app.Config) {
 	srv := NewHttpServer(listenAddr, hdl)
 	srv.ShutdownCallback = func() {
 		zap.S().Info("Cleaning up resources")
-    // add cleaning up resources
+		// add cleaning up resources
 		zap.S().Infof("Resources has been cleaned up")
 	}
 	zap.S().Info("Starting HTTP server...")
