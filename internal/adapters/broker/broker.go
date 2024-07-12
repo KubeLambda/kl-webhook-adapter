@@ -3,6 +3,7 @@ package broker
 import (
 	"fmt"
 	"serverless-service-webhook-adapter/internal/core/app"
+	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -63,13 +64,15 @@ func createStream(js *nats.JetStreamContext, streamName string, subjects []strin
 }
 
 func handleResponse(msg *nats.Msg) {
-	zap.S().Debugf("Received message: %s", msg.Data)
+	zap.S().Debugf("Received message: %s to %s", msg.Data, msg.Subject)
 
 	// Get the correlation ID from the message
-	correlationID := msg.Subject
+	correlationID := strings.Split(msg.Subject, ".")[1]
+	zap.S().Debugf("Message ID: %s", correlationID)
+	zap.S().Debugf("Message channels: %s", responseChans)
 
-	mu.Lock()
 	if ch, exists := responseChans[correlationID]; exists {
+	  mu.Lock()
 		err := msg.Ack()
 		if err != nil {
 			zap.S().Error("Unable to Ack %s", msg.Subject)
@@ -79,12 +82,15 @@ func handleResponse(msg *nats.Msg) {
 
 		close(ch)
 		delete(responseChans, correlationID)
-	}
-	mu.Unlock()
+	  mu.Unlock()
+	} else {
+    zap.S().Error("Unable to find channel with ID ", correlationID)
+    return
+  }
 }
 
 func GetResponseChan(correlationID string) chan *nats.Msg {
-	zap.S().Debugf("Create channel '%s'", correlationID)
+	zap.S().Debugf("Create channel with ID '%s'", correlationID)
 
 	mu.Lock()
 	defer mu.Unlock()

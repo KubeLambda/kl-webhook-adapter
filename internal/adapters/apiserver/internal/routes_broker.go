@@ -27,11 +27,12 @@ func SendToBroker() http.HandlerFunc {
 
 		// Generate a unique correlation ID
 		correlationID := uuid.New().String()
-		id := fmt.Sprintf("request.%s", correlationID)
-		zap.S().Debugf("New subject id: %s", id)
 
 		// Create a response channel and store it in the map
-		responseChan := broker.GetResponseChan(id)
+		responseChan := broker.GetResponseChan(correlationID)
+
+		id := fmt.Sprintf("request.%s", correlationID)
+		zap.S().Debugf("New subject id: %s", id)
 
 		js := *broker.JetStreamCtx
 		// Send the message
