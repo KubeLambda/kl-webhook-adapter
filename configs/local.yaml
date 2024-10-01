@@ -7,6 +7,6 @@ server:
   addr: 0.0.0.0
   port: 3000
 broker:
-  addr: nats
+  addr: localhost
   port: 4222
   stream: 'request-response'

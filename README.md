@@ -1,94 +1,93 @@
-## About
+# Webhook Adapter
 
-API Server application provides very basic functionality to work with Address Book contacts.
-You can create new contact with phone numbers, update existing contact, fetch contact by id,
-list all contacts, and delete existing contact.
+Webhook Adapter is a Go-based application that serves as an intermediary for handling webhook requests and responses. It uses NATS as a message broker and provides a REST API for interaction.
 
+## Features
 
-## How to build application
+- REST API for receiving webhook requests
+- NATS integration for message brokering
+- Configurable via environment variables and YAML files
+- Logging with request ID tracking for easy debugging
+- Docker support for easy deployment
 
-Open the directory with newly created project and run:
+## Prerequisites
 
-```sh
-go build -o bin/webhook-adapter
-```
-it will result in building executable file "webhook-adapter" (feel free to name it differently).
+- Go 1.22 or higher
+- NATS server
+- Docker with Docker Compose (optional, for e2e tests)
 
+## Installation
 
-## How to run application
+1. Clone the repository:
+   ```sh
+   git clone git@github.com:KubeLambda/kl-webhook-adapter.git
+   ```
 
-**IMPORTANT:** depending on your configuration, e.g. if you have added database support
-etc, starting of your code may fail because you need to complete configuration settings (e.g.
-your database URL and credentials). So in this case keep reading README past this section.
+2. Navigate to the project directory:
+   ```sh
+   cd webhook-adapter
+   ```
 
-To perform an initial launch an application, run this in shell:
+3. Install dependencies:
+   ```sh
+   go mod tidy
+   ```
 
-```sh
-make run --deployment=local
-```
+## Configuration
 
-We launch API server by specifying `run` command. `--deployment=local` tells our code to
-perform a local deployment. Local deployment settings can contain options such as URL of
-your local database or other local specific environment. `--deployment` flag loads
-file `local.yaml` from `config/` directory that resides in the same directory where
-your executable file is. You can create a copy of this file and name it,
-for example `prod.yaml` where you can add production-specific settings, then running
-
-```sh
-make run --deployment=prod
-```
-
-will load this production settings for your API server.
-
-
-## How to override configuration values
-
-Sometimes editing configuration file to add values is not the best strategy. As an example,
-if you have database settings in your `prod.yaml` file, having URL of database specified
-there is not a bad idea, but storing a password there - is not good. The better approach
-would be to pass sensitive settings via environment variables. And because we use
-viper library to load yaml configuration file, it allows us to override values specified
-in it with something different. The typical syntax of environment variable is:
-`[EnvPrefix]_[YamlConfigKey] = value`. `EnvPrefix` is something you have previously entered when
-generated project with GoQuick.
-
-**internal/core/app/configload.go:**
-```
-const envVarPrefix = "WEBHOOK_ADAPTER"
-```
-
-Let's give it a try. Let's say you want to change a listening port for your API server.
-If you open `local.yaml` you can find something like this:
+The application can be configured using environment variables or a YAML configuration file. For production, use the configs/production.yaml file:
 
 ```yaml
+name: webhook-adapter
+credentials:
+  key: _
+  secret: _
 server:
-  port: 8080
+  addr: 0.0.0.0
+  port: 3001
+broker:
+  addr: 0.0.0.0
+  port: 4222
+  stream: 'request-response'
+credentials:
+  key: _
+  secret: _
 ```
 
-`server/port` translates to SERVER_PORT and combined with environment prefix WEBHOOK_ADAPTER
-you can override it as:
+For development, you can use the configs/local.yaml.
 
-```shell
-export WEBHOOK_ADAPTER_SERVER_PORT=9090
-```
+Environment variables can override these settings:
+
+- WEBHOOK_ADAPTER_CREDENTIALS_KEY
+- WEBHOOK_ADAPTER_CREDENTIALS_SECRET
+- WEBHOOK_ADAPTER_SERVER_ADDR
+- WEBHOOK_ADAPTER_SERVER_PORT
+- WEBHOOK_ADAPTER_BROKER_ADDR
+- WEBHOOK_ADAPTER_BROKER_PORT
+
+## Building and Running
+
+To build the application:
+
 ```sh
-./WEBHOOK_ADAPTER run --deployment=local
+make build
 ```
 
-now API server code will be listing port 9090 instead of 8080.
+To run the application:
+
+```sh
+make run deployment=local
+```
+
 
 ## Access REST API
 
 Generated application uses REST protocol to store and fetch address book records.
-Once you have the application launched, you can perform HTTP calls to test REST APIs
-exposed by API server.
+Once you have the application launched, you can perform HTTP calls to test REST APIs exposed by API server.
 
-Please note that each HTTP response contains **X-Request-Id** header with value that
-is displayed with application logs (as **requestId** field). It helps you to troubleshoot
-application, because logger provided with generated code prints request id with
-every log line.
+Please note that each HTTP response contains **X-Request-Id** header with value that is displayed with application logs (as **requestId** field). It helps you to troubleshoot application, because logger provided with generated code prints request id with every log line.
 
-### Examples of REST requests
+### API Usage
 
 #### Get service version 
 
@@ -123,8 +122,43 @@ Response:
 
 ### Logging
 
-Each HTTP request returns `X-Request-Id` header as part of response. This `X-Request-Id`
-is always unique, unless you specify it explicitly as part of request. What makes it useful
-is that each application log line contains `{requestId="...."}` tag, and it matches
-`X-Request-Id` value. It makes debugging code much easier because you can filter logs
-scoped to specific request.
+Each HTTP request returns `X-Request-Id` header as part of response. This `X-Request-Id` is always unique, unless you specify it explicitly as part of request. What makes it useful is that each application log line contains `{requestId="...."}` tag, and it matches `X-Request-Id` value. It makes debugging code much easier because you can filter logs scoped to specific request.
+
+## Docker
+
+To run the application in a Docker container, use the following command:
+
+```sh
+docker build -t webhook-adapter .
+docker run -p 3001:3001 webhook-adapter
+```
+
+## Testing
+
+To run unit tests:
+
+```sh
+make test
+```
+
+For test coverage:
+
+```sh
+make test-coverage
+```
+
+To run e2e tests:
+
+```sh
+make test-e2e
+```
+
+## License
+
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
+
+## Contributing
+
+
+Contributions are welcome! Please feel free to submit a Pull Request.
