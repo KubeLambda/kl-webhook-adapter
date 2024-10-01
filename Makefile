@@ -10,7 +10,7 @@ bin:
 build: vet fmt bin
 
 run:
-	./bin/webhook-adapter
+	./bin/webhook-adapter run --deployment=${deployment}
 
 test:
 	go test ./...
