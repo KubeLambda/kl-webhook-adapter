@@ -2,9 +2,10 @@ package infra
 
 import (
 	"context"
+	"kl-webhook-adapter/internal/adapters/apiserver"
+	"kl-webhook-adapter/internal/core/app"
+
 	"go.uber.org/zap"
-	"serverless-service-webhook-adapter/internal/adapters/apiserver"
-	"serverless-service-webhook-adapter/internal/core/app"
 )
 
 func Start(deployment string) {

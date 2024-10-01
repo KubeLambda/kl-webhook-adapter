@@ -1,11 +1,13 @@
 package apiserver
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"net/http"
-	"serverless-service-webhook-adapter/internal/core/app"
-	"time"
+
+	"kl-webhook-adapter/internal/core/app"
 )
 
 const httpLogFormat = `"[END] %s %s %s" from %s`

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"kl-webhook-adapter/internal/adapters/broker"
 	"net/http"
-	"serverless-service-webhook-adapter/internal/adapters/broker"
 	"time"
 
 	"github.com/google/uuid"

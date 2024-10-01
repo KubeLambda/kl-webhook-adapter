@@ -8,9 +8,9 @@ import (
 	"github.com/rs/cors"
 	"go.uber.org/zap"
 
-	"serverless-service-webhook-adapter/internal/adapters/apiserver/internal"
-	"serverless-service-webhook-adapter/internal/adapters/broker"
-	"serverless-service-webhook-adapter/internal/core/app"
+	"kl-webhook-adapter/internal/adapters/apiserver/internal"
+	"kl-webhook-adapter/internal/adapters/broker"
+	"kl-webhook-adapter/internal/core/app"
 )
 
 func Start(_ context.Context, cfg *app.Config) {

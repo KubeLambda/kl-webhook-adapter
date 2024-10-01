@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"serverless-service-webhook-adapter/internal/infra"
+	"kl-webhook-adapter/internal/infra"
 
 	"github.com/spf13/cobra"
 )

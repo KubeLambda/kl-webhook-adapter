@@ -2,9 +2,10 @@ package broker
 
 import (
 	"fmt"
-	"serverless-service-webhook-adapter/internal/core/app"
 	"strings"
 	"sync"
+
+	"kl-webhook-adapter/internal/core/app"
 
 	"go.uber.org/zap"
 
@@ -72,7 +73,7 @@ func handleResponse(msg *nats.Msg) {
 	zap.S().Debugf("Message channels: %s", responseChans)
 
 	if ch, exists := responseChans[correlationID]; exists {
-	  mu.Lock()
+		mu.Lock()
 		err := msg.Ack()
 		if err != nil {
 			zap.S().Error("Unable to Ack %s", msg.Subject)
@@ -82,11 +83,11 @@ func handleResponse(msg *nats.Msg) {
 
 		close(ch)
 		delete(responseChans, correlationID)
-	  mu.Unlock()
+		mu.Unlock()
 	} else {
-    zap.S().Error("Unable to find channel with ID ", correlationID)
-    return
-  }
+		zap.S().Error("Unable to find channel with ID ", correlationID)
+		return
+	}
 }
 
 func GetResponseChan(correlationID string) chan *nats.Msg {
